@@ -1,0 +1,260 @@
+﻿@page "/"
+@inject IObjectService ObjectService
+@inject ISnackbar Snackbar
+
+<MudDialogProvider />
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">Object Catalog</MudText>
+
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField @bind-Value="searchQuery"
+                          @bind-Value:after="SearchObjects"
+                          Label="Search by Name"
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Clearable="true" />
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudSelect T="int?"
+                       Label=Filter by Category
+                       Variant=Variant.Outlined
+                       @bind-Value=selectedCategoryId
+                       @bind-Value:after="SearchObjects"
+                       Clearable=true
+                       Immediate=true>
+
+                <MudSelectItem T="int?" Value="@((int?)null)">All Categories</MudSelectItem>
+                @foreach (var category in categories)
+                {
+                    <MudSelectItem T="int?" Value="@((int?)category.Id)">@category.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenAddDialog">
+                Add Object
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <MudTable T="ObjectEntity"
+              @ref="mudTable"
+              ServerData="@(new Func<TableState, CancellationToken, Task<TableData<ObjectEntity>>>(LoadObjects))"
+              Hover="true"
+              Breakpoint="Breakpoint.Sm"
+              Loading="@loading"
+              LoadingProgressColor="Color.Info"
+              RowsPerPage="10"
+              Class="mt-4">
+        <HeaderContent>
+            <MudTh>ID</MudTh>
+            <MudTh>Name</MudTh>
+            <MudTh>Description</MudTh>
+            <MudTh>Price</MudTh>
+            <MudTh>Created Date</MudTh>
+            <MudTh>Categories</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Id</MudTd>
+            <MudTd>@context.Name</MudTd>
+            <MudTd>@context.Description</MudTd>
+            <MudTd>@context.Price.ToString("C")</MudTd>
+            <MudTd>@context.CreatedDate.ToShortDateString()</MudTd>
+            <MudTd>@string.Join(", ", context.Categories.Select(c => c.Name))</MudTd>
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               OnClick="@(() => OpenEditDialog(context))" />
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error"
+                               Size="Size.Small"
+                               OnClick="@(() => DeleteObject(context.Id))" />
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+
+    <MudDialog @ref="mudDialog"         
+        Options="dialogOptions">
+        <TitleContent>
+            <MudText Typo="Typo.h6" Color="Color.Primary">
+                @(editingObject == null ? "Add Object" : "Edit Object")
+            </MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudCard Elevation="0">
+                <MudCardContent>
+                    <MudTextField @bind-Value="newObject.Name"
+                                  Label="Name"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Required="true" />
+                    <MudTextField @bind-Value="newObject.Description"
+                                  Label="Description"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Lines="3" />
+                    <MudNumericField @bind-Value="newObject.Price"
+                                     Label="Price"
+                                     Variant="Variant.Outlined"
+                                     Margin="Margin.Dense"
+                                     Min="0"
+                                     Required="true" />
+                </MudCardContent>
+            </MudCard>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CancelDialog" Variant="Variant.Text">Cancel</MudButton>
+            <MudButton Color="Color.Primary"
+                       Variant="Variant.Filled"
+                       OnClick="SaveObject">
+                @(editingObject == null ? "Add" : "Save")
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</MudContainer>
+
+@code {
+    private string searchQuery = string.Empty;
+    private int? selectedCategoryId = null;
+    private List<Category> categories = new();
+    private ObjectEntity newObject = new();
+    private ObjectEntity? editingObject;
+    private bool loading = false;
+    private DialogOptions dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    private MudTable<ObjectEntity>? mudTable;
+    private MudDialog? mudDialog;
+    private static SemaphoreSlim RefreshLock { get; } = new SemaphoreSlim(1);
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await ObjectService.GetAllCategoriesAsync();
+    }
+
+    private async Task<TableData<ObjectEntity>> LoadObjects(TableState state, CancellationToken cancellationToken)
+    {
+        loading = true;
+
+        try
+        {
+            await RefreshLock.WaitAsync();
+
+            var result = await ObjectService.GetPagedObjectsAsync(
+                state.Page * state.PageSize,
+                state.PageSize,
+                searchQuery,
+                selectedCategoryId);
+
+            return new TableData<ObjectEntity>
+            {
+                Items = result.Items,
+                TotalItems = result.TotalItems
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading objects: {ex.Message}", Severity.Error);
+            return new TableData<ObjectEntity> { Items = new List<ObjectEntity>(), TotalItems = 0 };
+        }
+        finally
+        {
+            RefreshLock.Release();
+            loading = false;
+        }
+    }
+
+    private async Task SearchObjects()
+    {
+        if (mudTable != null)
+        {
+            mudTable.NavigateTo(0);
+
+            await mudTable.ReloadServerData();
+        }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        newObject = new ObjectEntity();
+        editingObject = null;
+
+        await mudDialog!.ShowAsync();
+
+        Snackbar.Add("Opening Add Dialog", Severity.Info); // Debug
+
+        StateHasChanged();
+    }
+
+    private async Task OpenEditDialog(ObjectEntity obj)
+    {
+        newObject = new ObjectEntity
+        {
+            Id = obj.Id,
+            Name = obj.Name,
+            Description = obj.Description,
+            Price = obj.Price
+        };
+        editingObject = obj;
+        await mudDialog!.ShowAsync();
+    }
+
+    private async Task SaveObject()
+    {
+        if (string.IsNullOrWhiteSpace(newObject.Name) || newObject.Price < 0)
+        {
+            Snackbar.Add("Name and valid Price are required.", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            if (editingObject == null)
+            {
+                await ObjectService.AddObjectAsync(newObject);
+                Snackbar.Add("Object added successfully.", Severity.Success);
+            }
+            else
+            {
+                await ObjectService.UpdateObjectAsync(editingObject.Id, newObject);
+                Snackbar.Add("Object updated successfully.", Severity.Success);
+            }
+
+            await mudDialog!.CloseAsync();           
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving object: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CancelDialog()
+    {
+        await mudDialog!.CloseAsync();
+    }
+
+    private async Task DeleteObject(int id)
+    {
+        try
+        {
+            await ObjectService.DeleteObjectAsync(id);
+
+            await mudTable!.ReloadServerData();
+
+            Snackbar.Add("Object deleted successfully.", Severity.Success);           
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting object: {ex.Message}", Severity.Error);
+        }
+    }
+}
