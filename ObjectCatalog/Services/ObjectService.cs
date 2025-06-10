@@ -4,14 +4,9 @@ using ObjectCatalog.Models;
 
 namespace ObjectCatalog.Services;
 
-public class ObjectService : IObjectService
+public class ObjectService(ObjectCatalogDbContext context) : IObjectService
 {
-    private readonly ObjectCatalogDbContext _context;
-
-    public ObjectService(ObjectCatalogDbContext context)
-    {
-        _context = context;
-    }
+    private readonly ObjectCatalogDbContext _context = context;
 
     public async Task<List<ObjectEntity>> GetAllObjectsAsync()
         => await _context.Objects
@@ -24,18 +19,18 @@ public class ObjectService : IObjectService
     public async Task<ObjectEntity> GetObjectByIdAsync(int id)
         => await _context.Objects
             .Include(o => o.Categories)
-            .FirstOrDefaultAsync(o => o.Id == id);
+            .FirstOrDefaultAsync(o => o.Id == id);    
 
     public async Task<(List<ObjectEntity> Items, int TotalItems)> GetPagedObjectsAsync(int skip, int take, string? searchQuery = null, int? categoryId = null)
     {
         var query = _context.Objects
             .Include(o => o.Categories)
+            .AsNoTracking()
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(searchQuery))
         {
             query = query.Where(o => EF.Functions.Like(o.Name, $"%{searchQuery}%"));
-            //query = query.Where(o => o.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
         }
 
         if (categoryId.HasValue)
@@ -44,6 +39,7 @@ public class ObjectService : IObjectService
         }
 
         query = query.OrderBy(o => o.Id);
+
         var totalItems = await query.CountAsync();
         var items = await query
             .Skip(skip)
@@ -68,7 +64,6 @@ public class ObjectService : IObjectService
         _context.Objects.Add(obj);
         await _context.SaveChangesAsync();
     }
-
 
     public async Task<ObjectEntity?> UpdateObjectAsync(int id, ObjectEntity obj, int[] categoryIds)
     {

@@ -54,10 +54,10 @@ foreach (var api in apis)
 }
 
 /// Seed database on startup
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<ObjectCatalogDbContext>();
-    await DataSeeder.SeedDataV2(db);
-}
+//using (var scope = app.Services.CreateScope())
+//{
+//    var db = scope.ServiceProvider.GetRequiredService<ObjectCatalogDbContext>();
+//    await DataSeeder.SeedDataV2(db);
+//}
 
 app.Run();

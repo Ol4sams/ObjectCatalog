@@ -7,5 +7,5 @@ public class ObjectDto
     public string? Description { get; set; }
     public decimal Price { get; set; }
     public DateTime CreatedDate { get; set; }
-    public IEnumerable<string> Categories { get; set; } = Enumerable.Empty<string>();
+    public IEnumerable<string> Categories { get; set; } = [];
 }

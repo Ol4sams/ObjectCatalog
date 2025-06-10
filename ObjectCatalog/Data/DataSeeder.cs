@@ -9,19 +9,22 @@ public class DataSeeder
 {
     public static async Task SeedDataV2(ObjectCatalogDbContext context)
     {
-        Console.WriteLine("Creating DB...");
-        await context.Database.EnsureCreatedAsync();
-
-        Console.WriteLine("Starting database seeding...");
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         Console.WriteLine("Clearing existing data...");
-        await ClearAllTables(context);
-        Console.WriteLine($"Database cleared in {sw.ElapsedMilliseconds}ms");
+        await context.Database.EnsureDeletedAsync();
+
+        Console.WriteLine("Creating DB...");
+        await context.Database.EnsureCreatedAsync();
+
+        //Console.WriteLine("Clearing existing data...");
+        //await ClearAllTables(context);
+        Console.WriteLine($"Database ready in {sw.ElapsedMilliseconds}ms");
 
         context.ChangeTracker.AutoDetectChangesEnabled = false;
         context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 
+        Console.WriteLine("Starting database seeding...");
         Console.WriteLine("Seeding Categories...");
         await SeedCategories(context);
         Console.WriteLine($"Seeded categories in {sw.ElapsedMilliseconds}ms");
