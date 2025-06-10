@@ -7,5 +7,5 @@ public class ObjectEntity
     public string Description { get; set; }
     public decimal Price { get; set; }
     public DateTime CreatedDate { get; set; }
-    public List<Category> Categories { get; set; } = new List<Category>();
+    public List<Category> Categories { get; set; } = [];
 }

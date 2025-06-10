@@ -14,6 +14,7 @@ builder.Services.AddMudServices();
 builder.Services.AddDbContext<ObjectCatalogDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IObjectService, ObjectService>();
+builder.Services.AddTransient<IApi, ObjectCatalogApi>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -45,14 +46,18 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 /// Register API endpoints
-var api = new ObjectCatalogApi();
-api.Register(app);
+var apis = app.Services.GetServices<IApi>();
+foreach (var api in apis)
+{
+    if (api is null) throw new InvalidProgramException("Api not found");
+    api.Register(app);
+}
 
 /// Seed database on startup
-//using (var scope = app.Services.CreateScope())
-//{
-//    var db = scope.ServiceProvider.GetRequiredService<ObjectCatalogDbContext>();
-//    await DataSeeder.SeedDataV1(db);
-//}
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ObjectCatalogDbContext>();
+    await DataSeeder.SeedDataV2(db);
+}
 
 app.Run();

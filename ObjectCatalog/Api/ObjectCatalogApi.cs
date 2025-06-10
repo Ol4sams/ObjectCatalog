@@ -157,7 +157,7 @@ public class ObjectCatalogApi : IApi
     }
 
     private async Task<Results<Created<ObjectDto>, BadRequest<ProblemDetails>>> CreateObject(
-        IObjectService objectService,
+        IObjectService service,
         [FromBody] ObjectInputModel input)
     {
         try
@@ -176,11 +176,10 @@ public class ObjectCatalogApi : IApi
             {
                 Name = input.Name,
                 Description = input.Description,
-                Price = input.Price,
-                CreatedDate = DateTime.UtcNow
+                Price = input.Price
             };
 
-            await objectService.AddObjectAsync(obj);
+            await service.AddObjectAsync(obj, input.CategoryIds);
 
             return TypedResults.Created($"{CreateObjectEP}/{obj.Id}", new ObjectDto
             {
@@ -189,7 +188,7 @@ public class ObjectCatalogApi : IApi
                 Description = obj.Description,
                 Price = obj.Price,
                 CreatedDate = obj.CreatedDate,
-                Categories = []
+                Categories = obj.Categories.Select(c => c.Name)
             });
         }
         catch (Exception ex)
@@ -224,11 +223,10 @@ public class ObjectCatalogApi : IApi
             {
                 Name = input.Name,
                 Description = input.Description,
-                Price = input.Price,
-                CreatedDate = DateTime.UtcNow
+                Price = input.Price,                
             };
 
-            await service.UpdateObjectAsync(id, obj);
+            await service.UpdateObjectAsync(id, obj, input.CategoryIds);
 
             return TypedResults.Ok(new ObjectDto
             {
