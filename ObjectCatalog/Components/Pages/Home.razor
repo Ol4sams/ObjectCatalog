@@ -1,8 +1,13 @@
 ﻿@page "/"
 @inject IObjectService ObjectService
 @inject ISnackbar Snackbar
+@inject NavigationManager NM
 
 <MudDialogProvider />
+
+<PageTitle>
+    Object Catalog
+</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
     <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">Object Catalog</MudText>
@@ -34,12 +39,21 @@
             </MudSelect>
         </MudItem>
         <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
-            <MudButton Variant="Variant.Filled"
+
+            <MudButton Class="ma-1" Variant="Variant.Filled"
                        Color="Color.Primary"
                        StartIcon="@Icons.Material.Filled.Add"
                        OnClick="OpenAddDialog">
                 Add Object
             </MudButton>
+
+            <MudButton Class="ma-1" Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AddLink"
+                       OnClick=@(_ => NM.NavigateTo("/swagger", true))>
+                Apis
+            </MudButton>
+
         </MudItem>
     </MudGrid>
 
@@ -84,8 +98,8 @@
         </PagerContent>
     </MudTable>
 
-    <MudDialog @ref="mudDialog"         
-        Options="dialogOptions">
+    <MudDialog @ref="mudDialog"
+               Options="dialogOptions">
         <TitleContent>
             <MudText Typo="Typo.h6" Color="Color.Primary">
                 @(editingObject == null ? "Add Object" : "Edit Object")
@@ -149,8 +163,15 @@
         {
             await RefreshLock.WaitAsync();
 
+            var page = state.Page;
+
+            if (page < 0)
+            {
+                page = 0;
+            }
+
             var result = await ObjectService.GetPagedObjectsAsync(
-                state.Page * state.PageSize,
+                page * state.PageSize,
                 state.PageSize,
                 searchQuery,
                 selectedCategoryId);
@@ -175,12 +196,10 @@
 
     private async Task SearchObjects()
     {
-        if (mudTable != null)
-        {
-            mudTable.NavigateTo(0);
+        await mudTable!.ReloadServerData();
 
-            await mudTable.ReloadServerData();
-        }
+        if(mudTable!.Items is not null)
+            mudTable!.NavigateTo(0);
     }
 
     private async Task OpenAddDialog()
@@ -190,9 +209,6 @@
 
         await mudDialog!.ShowAsync();
 
-        Snackbar.Add("Opening Add Dialog", Severity.Info); // Debug
-
-        StateHasChanged();
     }
 
     private async Task OpenEditDialog(ObjectEntity obj)
@@ -205,6 +221,7 @@
             Price = obj.Price
         };
         editingObject = obj;
+
         await mudDialog!.ShowAsync();
     }
 
@@ -220,16 +237,17 @@
         {
             if (editingObject == null)
             {
-                await ObjectService.AddObjectAsync(newObject);
+                await ObjectService.AddObjectAsync(newObject, []);
                 Snackbar.Add("Object added successfully.", Severity.Success);
             }
             else
             {
-                await ObjectService.UpdateObjectAsync(editingObject.Id, newObject);
+                await ObjectService.UpdateObjectAsync(editingObject.Id, newObject, []);
                 Snackbar.Add("Object updated successfully.", Severity.Success);
             }
 
-            await mudDialog!.CloseAsync();           
+            await mudTable!.ReloadServerData();
+            await mudDialog!.CloseAsync();
         }
         catch (Exception ex)
         {
@@ -250,7 +268,7 @@
 
             await mudTable!.ReloadServerData();
 
-            Snackbar.Add("Object deleted successfully.", Severity.Success);           
+            Snackbar.Add("Object deleted successfully.", Severity.Success);
         }
         catch (Exception ex)
         {
