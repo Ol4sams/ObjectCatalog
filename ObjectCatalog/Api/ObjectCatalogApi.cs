@@ -226,7 +226,17 @@ public class ObjectCatalogApi : IApi
                 Price = input.Price,                
             };
 
-            await service.UpdateObjectAsync(id, obj, input.CategoryIds);
+            obj = await service.UpdateObjectAsync(id, obj, input.CategoryIds);
+
+            if (obj == null)
+            {
+                return TypedResults.NotFound(new ProblemDetails
+                {
+                    Title = "Object not found",
+                    Detail = $"No object found with ID {id}",
+                    Status = StatusCodes.Status404NotFound
+                });
+            }
 
             return TypedResults.Ok(new ObjectDto
             {
@@ -235,7 +245,7 @@ public class ObjectCatalogApi : IApi
                 Description = obj.Description,
                 Price = obj.Price,
                 CreatedDate = obj.CreatedDate,
-                Categories = []
+                Categories = string.Join(", ", obj.Categories.Select(c => c.Name)).Split(',')
             });
         }
         catch (Exception ex)

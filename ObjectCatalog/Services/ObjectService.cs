@@ -70,9 +70,10 @@ public class ObjectService : IObjectService
     }
 
 
-    public async Task UpdateObjectAsync(int id, ObjectEntity obj, int[] categoryIds)
+    public async Task<ObjectEntity?> UpdateObjectAsync(int id, ObjectEntity obj, int[] categoryIds)
     {
         var existing = await _context.Objects.FindAsync(id);
+
         if (existing != null)
         {
             existing.Name = obj.Name;
@@ -94,6 +95,8 @@ public class ObjectService : IObjectService
 
             await _context.SaveChangesAsync();
         }
+
+        return existing;
     }
 
     public async Task DeleteObjectAsync(int id)
